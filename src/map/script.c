@@ -49,6 +49,7 @@
 #include "map/pet.h"
 #include "map/pet.h"
 #include "map/quest.h"
+#include "map/queue.h"
 #include "map/skill.h"
 #include "map/status.h"
 #include "map/status.h"
@@ -17755,11 +17756,11 @@ BUILDIN(showevent)
 BUILDIN(waitingroom2bg) {
 	struct npc_data *nd;
 	struct chat_data *cd;
-	const char *map_name, *ev = "", *dev = "";
-	int x, y, i, map_index = 0, bg_id, n;
+	const char *map_name, *ev = "", *dev = "", *wev = "";
+	int x, y, i, army, map_index = 0, bg_id, n;
 
-	if( script_hasdata(st,7) )
-		nd = npc->name2id(script_getstr(st,7));
+	if( script_hasdata(st,9) )
+		nd = npc->name2id(script_getstr(st,9));
 	else
 		nd = map->id2nd(st->oid);
 
@@ -17781,10 +17782,12 @@ BUILDIN(waitingroom2bg) {
 
 	x = script_getnum(st,3);
 	y = script_getnum(st,4);
-	ev = script_getstr(st,5); // Logout Event
-	dev = script_getstr(st,6); // Die Event
+	army = script_getnum(st,5);
+	ev = script_getstr(st,6); // Logout Event
+	dev = script_getstr(st,7); // Die Event
+	wev = script_getstr(st,8); // Wo Event
 
-	if ((bg_id = bg->create(map_index, x, y, ev, dev)) == 0) {
+	if ((bg_id = bg->create(map_index, x, y, 0, 0, army, ev, dev, wev)) == 0) {
 		// Creation failed
 		script_pushint(st,0);
 		return true;
@@ -17795,7 +17798,7 @@ BUILDIN(waitingroom2bg) {
 
 	for (i = 0; i < n && i < MAX_BG_MEMBERS; i++) {
 		struct map_session_data *sd = cd->usersd[i];
-		if (sd != NULL && bg->team_join(bg_id, sd))
+		if (sd != NULL && bg->team_join(bg_id, sd, 0))
 			mapreg->setreg(reference_uid(script->add_str("$@arenamembers"), i), sd->bl.id);
 		else
 			mapreg->setreg(reference_uid(script->add_str("$@arenamembers"), i), 0);
@@ -17828,7 +17831,7 @@ BUILDIN(waitingroom2bg_single) {
 	if( (sd = cd->usersd[0]) == NULL )
 		return true;
 
-	if( bg->team_join(bg_id, sd) )
+	if( bg->team_join(bg_id, sd, 0) )
 	{
 		pc->setpos(sd, map_index, x, y, CLR_TELEPORT);
 		script_pushint(st,1);
@@ -17871,7 +17874,7 @@ BUILDIN(bg_warp)
 BUILDIN(bg_monster)
 {
 	int class_ = 0, x = 0, y = 0, bg_id = 0;
-	const char *str, *mapname, *evt="";
+	const char *str, *mapname, *evt="", *info="";
 
 	bg_id   = script_getnum(st,2);
 	mapname = script_getstr(st,3);
@@ -17879,9 +17882,10 @@ BUILDIN(bg_monster)
 	y       = script_getnum(st,5);
 	str     = script_getstr(st,6);
 	class_  = script_getnum(st,7);
-	if( script_hasdata(st,8) ) evt = script_getstr(st,8);
+	if (script_hasdata(st,8)) info = script_getstr(st,8);
+	if (script_hasdata(st,9)) evt = script_getstr(st,9);
 	script->check_event(st, evt);
-	script_pushint(st, mob->spawn_bg(mapname,x,y,str,class_,evt,bg_id));
+	script_pushint(st, mob->spawn_bg(mapname,x,y,str,class_,evt,bg_id,info));
 	return true;
 }
 
@@ -17973,6 +17977,7 @@ BUILDIN(bg_updatescore) {
 BUILDIN(bg_get_data)
 {
 	struct battleground_data *bgd;
+	struct map_session_data *sd = NULL;
 	int bg_id = script_getnum(st,2),
 	type = script_getnum(st,3);
 
@@ -17985,6 +17990,15 @@ BUILDIN(bg_get_data)
 	switch( type )
 	{
 		case 0: script_pushint(st, bgd->count); break;
+		case 1: script_pushint(st, bgd->army); break; // 0: Guill/1: Croix
+		case 2: script_pushint(st, bgd->master_id); break;
+		case 3:
+			sd = map->charid2sd(bgd->master_id);
+			if (sd == NULL)
+				script_pushint(st, 0);
+			else
+				script_pushstrcopy(st, sd->status.name);
+			break;
 		default:
 			ShowError("script:bg_get_data: unknown data identifier %d\n", type);
 			break;
@@ -19860,8 +19874,8 @@ BUILDIN(packageitem) {
 /* bg_team_create(map_name,respawn_x,respawn_y) */
 /* returns created team id or -1 when fails */
 BUILDIN(bg_create_team) {
-	const char *map_name, *ev = "", *dev = "";//ev and dev will be dropped.
-	int x, y, map_index = 0, bg_id;
+	const char *map_name, *ev = "", *dev = "", *wev = "";//ev and dev will be dropped.
+	int x, y, rx, ry, army, map_index = 0, bg_id;
 
 	map_name = script_getstr(st,2);
 	if( strcmp(map_name,"-") != 0 ) {
@@ -19874,8 +19888,14 @@ BUILDIN(bg_create_team) {
 
 	x = script_getnum(st,3);
 	y = script_getnum(st,4);
+	rx = script_getnum(st,5);
+	ry = script_getnum(st,6);
+	army = script_getnum(st,7);
+	ev = script_getstr(st,8);
+	dev = script_getstr(st,9);
+	wev = script_getstr(st,10);
 
-	if( (bg_id = bg->create(map_index, x, y, ev, dev)) == 0 ) { // Creation failed
+	if( (bg_id = bg->create(map_index, x, y, rx, ry, army, ev, dev, wev)) == 0 ) { // Creation failed
 		script_pushint(st,-1);
 	} else
 		script_pushint(st,bg_id);
@@ -19889,16 +19909,20 @@ BUILDIN(bg_create_team) {
 BUILDIN(bg_join_team) {
 	struct map_session_data *sd;
 	int team_id = script_getnum(st, 2);
+	int flag = 0;
 
 	if (script_hasdata(st, 3))
-		sd = script->id2sd(st, script_getnum(st, 3));
+		flag = script_getnum(st, 3);
+
+	if (script_hasdata(st,4))
+		sd = script->id2sd(st, script_getnum(st, 4));
 	else
 		sd = script->rid2sd(st);
 
 	if (sd == NULL)
 		script_pushint(st, -1);
 	else
-		script_pushint(st,bg->team_join(team_id, sd)?0:1);
+		script_pushint(st,bg->team_join(team_id, sd, flag)?0:1);
 
 	return true;
 }
@@ -21173,6 +21197,12 @@ BUILDIN(activatepset);
 BUILDIN(deactivatepset);
 BUILDIN(deletepset);
 
+/*==========================================
+ * CreativeSD: BattleGround & Queue System
+ *------------------------------------------*/
+#include "map/queue_scriptfunc.inc"
+#include "map/battleground_scriptfunc.inc"
+
 BUILDIN(pcre_match) {
 	const char *input = script_getstr(st, 2);
 	const char *regex = script_getstr(st, 3);
@@ -21739,7 +21769,7 @@ void script_parse_builtin(void) {
 		BUILDIN_DEF(waitingroom2bg_single,"isiis"),
 		BUILDIN_DEF(bg_team_setxy,"iii"),
 		BUILDIN_DEF(bg_warp,"isii"),
-		BUILDIN_DEF(bg_monster,"isiisi?"),
+		BUILDIN_DEF(bg_monster,"isiisi??"),
 		BUILDIN_DEF(bg_monster_set_team,"ii"),
 		BUILDIN_DEF(bg_leave,""),
 		BUILDIN_DEF(bg_destroy,"i"),
@@ -21842,8 +21872,8 @@ void script_parse_builtin(void) {
 		BUILDIN_DEF(montransform, "vi?????"), // Monster Transform [malufett/Hercules]
 
 		/* New BG Commands [Hercules] */
-		BUILDIN_DEF(bg_create_team,"sii"),
-		BUILDIN_DEF(bg_join_team,"i?"),
+		BUILDIN_DEF(bg_create_team, "siiiiisss"),
+		BUILDIN_DEF(bg_join_team, "i??"),
 		BUILDIN_DEF(bg_match_over,"s?"),
 
 		/* New Shop Support */
@@ -21864,7 +21894,10 @@ void script_parse_builtin(void) {
 		BUILDIN_DEF(getunitdata,"i*"),
 		BUILDIN_DEF(setunitdata,"iii"),
 		BUILDIN_DEF(costume, "i"), // Costume System
-		
+
+		/* BattleGround & Queue System [CrativeSD] */
+#include "map/queue_scriptdef.inc"
+#include "map/battleground_scriptdef.inc"
 		/* Camarim */
 		BUILDIN_DEF(opendressroom,"?"),
  		BUILDIN_DEF(closedressroom,"?"),
@@ -22054,6 +22087,7 @@ void script_hardcoded_constants(void) {
 #else
 	script->set_constant("RENEWAL_ASPD", 0, false);
 #endif
+	script->set_constant("MAX_QUEUE", MAX_QUEUE_PLAYERS, false);
 }
 
 /**

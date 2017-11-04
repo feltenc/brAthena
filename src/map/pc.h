@@ -587,7 +587,17 @@ END_ZEROED_BLOCK;
 	const char* delunit_prevfile;
 	int delunit_prevline;
 	
+	// [CreativeSD]
+	unsigned int queue_id;
+	unsigned int queue_nomove;
+
+	unsigned int bg_position;
+	unsigned int bg_queue_id;
+	int bg_afk_timer;
+	int bg_respawn_timer_count;
+	int bg_respawn_timer;	
 	int c_marker[MAX_SKILL_CRIMSON_MARKER];
+	
 	bool flicker;
 
 	// [CarlosHenrq] Enviando mac_address no pacote entre os servidores.

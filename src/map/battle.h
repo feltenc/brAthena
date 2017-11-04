@@ -541,7 +541,24 @@ struct Battle_Config {
 
 	// Costume System [Mhalicot/Rebel/Zephyrus]
 	int reserved_costume_id;
-	
+
+	// [CreativeSD]: Queue System
+	int queue_join_delay;
+	int queue_only_towns;
+	int queue_notify;
+
+	// [CreativeSD] BattleGround Queue Expansive System
+	int bg_mode;
+	int bg_timer_attack;
+	int bg_group_filter;
+	int bg_achievement;
+	int bg_player_announce;
+	int bg_afk_timer;
+	int bg_afk_team_report;
+	int bg_afk_warp_save_point;
+	int bg_ranking_rows;
+	int bg_enable_skills;
+	int bg_name_position;	
 	int dispel_song; //Can songs be dispelled?
 
 	/** brAthena **/

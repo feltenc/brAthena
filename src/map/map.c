@@ -49,6 +49,7 @@
 #include "map/pc.h"
 #include "map/pet.h"
 #include "map/quest.h"
+#include "map/queue.h"
 #include "map/script.h"
 #include "map/skill.h"
 #include "map/status.h"
@@ -1838,6 +1839,10 @@ int map_quit(struct map_session_data *sd) {
 
 	npc->script_event(sd, NPCE_LOGOUT);
 
+	// [CreativeSD]: Queue System
+	if (sd->queue_id)
+		queue_leave(sd,4);
+
 	//Unit_free handles clearing the player related data,
 	//map->quit handles extra specific data which is related to quitting normally
 	//(changing map-servers invokes unit_free but bypasses map->quit)
@@ -2894,6 +2899,8 @@ int map_getcellp(struct map_data* m, const struct block_list *bl, int16 x, int16
 		return 0;
 #endif
 
+	case CELL_CHKNOBATTLEGROUND:
+		return (cell.nobattleground);
 	default:
 		return 0;
 	}
@@ -2932,6 +2939,7 @@ void map_setcell(int16 m, int16 x, int16 y, cell_t cell, bool flag) {
 	case CELL_NOCHAT:        map->list[m].cell[j].nochat = flag;        break;
 	case CELL_ICEWALL:       map->list[m].cell[j].icewall = flag;       break;
 	case CELL_NOICEWALL:     map->list[m].cell[j].noicewall = flag;     break;
+	case CELL_NOBATTLEGROUND: map->list[m].cell[j].nobattleground = flag;	break;
 
 	default:
 		ShowWarning("map_setcell: tipo de celula invalida '%d'\n", (int)cell);
@@ -5704,6 +5712,7 @@ int do_final(void) {
 	elemental->final();
 	map->list_final();
 	vending->final();
+	do_final_queue();
 
 	map->map_db->destroy(map->map_db, map->db_final);
 
@@ -6201,6 +6210,7 @@ int do_init(int argc, char *argv[])
 	bg->init(minimal);
 	duel->init(minimal);
 	vending->init(minimal);
+	do_init_queue();
 
 	if (map->scriptcheck) {
 		bool failed = map->extra_scripts_count > 0 ? false : true;

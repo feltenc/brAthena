@@ -207,7 +207,7 @@ enum {
 // Max allowed chat text length
 #define CHAT_SIZE_MAX (255 + 1)
 // 24 for npc name + 24 for label + 2 for a "::" and 1 for EOS
-#define EVENT_NAME_LENGTH ( NAME_LENGTH * 2 + 3 )
+#define EVENT_NAME_LENGTH ( NPC_NAME_LENGTH * 2 + 3 )
 #define DEFAULT_AUTOSAVE_INTERVAL (5*60*1000)
 // Specifies maps where players may hit each other
 #define map_flag_vs(m) ( \
@@ -385,7 +385,7 @@ struct spawn_data {
 		unsigned int dynamic : 1; ///< Whether this data is indexed by a map's dynamic mob list
 		unsigned int boss : 1;    ///< 0: Non-boss monster | 1: Boss monster
 	} state;
-	char name[NAME_LENGTH], eventname[EVENT_NAME_LENGTH]; //Name/event
+	char name[NAME_LENGTH], desc[NAME_LENGTH], eventname[EVENT_NAME_LENGTH]; //Name/event
 };
 
 struct flooritem_data {
@@ -501,6 +501,7 @@ typedef enum {
 	CELL_NOCHAT,
 	CELL_ICEWALL,
 	CELL_NOICEWALL,
+	CELL_NOBATTLEGROUND = 15, // [CreativeSD] No BattleGround vs in cell.
 
 } cell_t;
 
@@ -525,6 +526,7 @@ typedef enum {
 	CELL_CHKNOCHAT,
 	CELL_CHKICEWALL,
 	CELL_CHKNOICEWALL,
+	CELL_CHKNOBATTLEGROUND = 21,	// [CreativeSD] No BattleGround vs in cell.
 
 } cell_chk;
 
@@ -543,7 +545,8 @@ struct mapcell {
 		novending : 1,
 		nochat : 1,
 		icewall : 1,
-		noicewall : 1;
+		noicewall : 1,
+		nobattleground : 1;	// [CreativeSD] No BattleGround vs in cell.
 
 #ifdef CELL_NOSTACK
 	int cell_bl; //Holds amount of bls in this cell.
@@ -715,6 +718,8 @@ struct map_data {
 		unsigned noknockback : 1;
 		unsigned notomb : 1;
 		unsigned nocashshop : 1;
+		unsigned nobgskillcall : 1; // [CreativeSD]
+		unsigned nobgrespawn : 1;
 		uint32 noviewid; ///< noviewid (bitmask - @see enum equip_pos)
 	} flag;
 	struct point save;

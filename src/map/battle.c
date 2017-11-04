@@ -3409,7 +3409,7 @@ int64 battle_calc_bg_damage(struct block_list *src, struct block_list *bl, int64
 	if (bl->type == BL_MOB) {
 		struct mob_data* md = BL_CAST(BL_MOB, bl);
 
-		if (flag&BF_SKILL && (md->class_ == MOBID_OBJ_A2 || md->class_ == MOBID_OBJ_B2))
+		if (flag&BF_SKILL && (md->class_ == MOBID_OBJ_A2 || md->class_ == MOBID_OBJ_B2 || md->class_ == MOBID_EMPELIUM || md->class_ == MOBID_S_EMPEL_1 || md->class_ == MOBID_S_EMPEL_2))
 			return 0; // Crystal cannot receive skill damage on battlegrounds
 	}
 
@@ -6898,6 +6898,8 @@ int battle_check_target( struct block_list *src, struct block_list *target,int f
 			 && !(map_flag_gvg(m) && map->list[m].flag.gvg_noparty && !( s_guild && s_guild == status->get_guild_id(t_bl) ))
 			 && (!map->list[m].flag.battleground || sbg_id == tbg_id) )
 				state |= BCT_PARTY;
+			else if( map->list[m].flag.battleground && map->getcell(s_bl->m,s_bl,s_bl->x,s_bl->y,CELL_CHKNOBATTLEGROUND) )
+				state |= BCT_PARTY; // [CreativeSD]: No battle in the cells of the BattleGrounds.
 			else
 				state |= BCT_ENEMY;
 		}
@@ -7398,6 +7400,28 @@ static const struct battle_data {
 	{ "save_body_style",                    &battle_config.save_body_style,                 0,      0,      1,              },
 	{ "reserved_costume_id",                &battle_config.reserved_costume_id,             999998, 0,      INT_MAX,        },
 	{ "dispel_song",                        &battle_config.dispel_song,                     0,      0,      1,              },
+	/*---------------------------------------------------
+	 * [CreativeSD] Queue System                        *
+	 *---------------------------------------------------
+	*/
+	{ "queue_join_delay",                   &battle_config.queue_join_delay, 0, 0, INT_MAX, },
+	{ "queue_notify",                       &battle_config.queue_notify, 0, 0, 3, },
+	{ "queue_only_towns",                   &battle_config.queue_only_towns, 0, 0, 1, },
+	/*---------------------------------------------------
+	 * [CreativeSD] BattleGround Expansive System       *
+	 *---------------------------------------------------
+	*/
+	{ "bg_mode",                            &battle_config.bg_mode, 1, 0, 1, },
+	{ "bg_timer_attack",                    &battle_config.bg_timer_attack, 1, 1, 1440, },
+	{ "bg_group_filter",                    &battle_config.bg_group_filter, 1, 0, 1, },
+	{ "bg_achievement",                     &battle_config.bg_achievement, 1, 0, 1, },
+	{ "bg_player_announce",                 &battle_config.bg_player_announce, 1, 0, 1, },
+	{ "bg_afk_timer",                       &battle_config.bg_afk_timer, 30, 30, 5000, },
+	{ "bg_afk_team_report",                 &battle_config.bg_afk_team_report, 1, 0, 1, },
+	{ "bg_afk_warp_save_point",             &battle_config.bg_afk_warp_save_point, 1, 0, 1, },
+	{ "bg_ranking_rows",                    &battle_config.bg_ranking_rows, 1, 1, 30, },
+	{ "bg_enable_skills",                   &battle_config.bg_enable_skills, 1, 0, 1, },
+	{ "bg_name_position",                   &battle_config.bg_name_position, 1, 0, 1, },
 	/**
 	 * brAthena
 	 **/

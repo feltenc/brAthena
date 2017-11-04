@@ -24,6 +24,7 @@
 #include "atcommand.h"
 
 #include "map/battle.h"
+#include "map/battleground.h"
 #include "map/channel.h"
 #include "map/chat.h"
 #include "map/chrif.h"
@@ -46,6 +47,7 @@
 #include "map/pc_groups.h" // groupid2name
 #include "map/pet.h"
 #include "map/quest.h"
+#include "map/queue.h"
 #include "map/script.h"
 #include "map/searchstore.h"
 #include "map/skill.h"
@@ -8383,6 +8385,12 @@ ACMD(font) {
 }
 
 /*==========================================
+ * CreativeSD: Queue & BattleGround System
+ *------------------------------------------*/
+#include "map/queue_atcommandfunc.inc"
+#include "map/battleground_atcommandfunc.inc"
+
+/*==========================================
  * type: 1 = commands (@), 2 = charcommands (#)
  *------------------------------------------*/
 void atcommand_commands_sub(struct map_session_data* sd, const int fd, AtCommandType type)
@@ -9725,6 +9733,11 @@ void atcommand_basecommands(void) {
 		ACMD_DEF(bodystyle),
 		ACMD_DEF(reloadcashshop),
 		ACMD_DEF2("costumeitem", item),
+	/*==========================================
+	 * CreativeSD: Queue & BattleGround System
+	 *------------------------------------------*/
+#include "map/queue_atcommanddef.inc"
+#include "map/battleground_atcommanddef.inc"
 	};
 	int i;
 

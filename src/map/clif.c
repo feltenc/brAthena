@@ -46,6 +46,7 @@
 #include "map/pc.h"
 #include "map/pet.h"
 #include "map/quest.h"
+#include "map/queue.h"
 #include "map/script.h"
 #include "map/skill.h"
 #include "map/status.h"
@@ -4297,6 +4298,8 @@ void clif_getareachar_unit(struct map_session_data* sd,struct block_list *bl) {
 					}
 				}
 #endif
+			if (md->bg_id && map->list[md->bl.m].flag.battleground && md->class_ != MOBID_EMPELIUM && !(md->class_ >= MOBID_BARRICADE && md->class_ <= MOBID_OBJ_B2) )
+				clif->sendbgmobemblem_single(sd->fd, md);
 			}
 			break;
 		case BL_PET:
@@ -8512,13 +8515,22 @@ void clif_charnameack (int fd, struct block_list *bl)
 			const struct map_session_data *ssd = BL_UCCAST(BL_PC, bl);
 			const struct party_data *p = NULL;
 			const struct guild *g = NULL;
+			const struct battleground_data *bgd = NULL;
 				int ps = -1;
 
 				//Requesting your own "shadow" name. [Skotlex]
 				if (ssd->fd == fd && ssd->disguise != -1)
 					WBUFL(buf,2) = -bl->id;
 
-			if (ssd->fakename[0] != '\0') {
+			// [CreativeSD]: Fake BattleGround Display Name.
+			if (battle_config.bg_name_position && ssd->bg_id && (bgd = bg->team_search(ssd->bg_id)) != NULL)
+			{
+				WBUFW(buf, 0) = cmd = 0x195;
+				memcpy(WBUFP(buf, 54), bg_pos_name[ssd->bg_position], NAME_LENGTH);
+				memcpy(WBUFP(buf, 78), bg_army[bgd->army], NAME_LENGTH);
+				WBUFB(buf, 30) = 0;
+			}
+			else if (ssd->fakename[0] != '\0') {
 					WBUFW(buf, 0) = cmd = 0x195;
 					memcpy(WBUFP(buf,6), ssd->fakename, NAME_LENGTH);
 					WBUFB(buf,30) = WBUFB(buf,54) = WBUFB(buf,78) = 0;
@@ -8529,7 +8541,7 @@ void clif_charnameack (int fd, struct block_list *bl)
 			if (ssd->status.party_id != 0) {
 					p = party->search(ssd->status.party_id);
 				}
-			if (ssd->status.guild_id != 0) {
+			if (!(battle_config.bg_name_position && ssd->bg_id && bgd != NULL) && ssd->status.guild_id != 0) {
 				if ((g = ssd->guild) != NULL) {
 						int i;
 						ARR_FIND(0, g->max_member, i, g->member[i].account_id == ssd->status.account_id && g->member[i].char_id == ssd->status.char_id);
@@ -8577,9 +8589,18 @@ void clif_charnameack (int fd, struct block_list *bl)
 		case BL_MOB:
 			{
 			const struct mob_data *md = BL_UCCAST(BL_MOB, bl);
+			const struct battleground_data *bgd = NULL;
 
 				memcpy(WBUFP(buf,6), md->name, NAME_LENGTH);
-			if (md->guardian_data && md->guardian_data->g) {
+			// [CreativeSD]: Fake BattleGround Display Name.
+			if (battle_config.bg_name_position && md->bg_id && (bgd = bg->team_search(md->bg_id)) != NULL && md->desc[0])
+			{
+				WBUFW(buf, 0) = cmd = 0x195;
+				WBUFB(buf, 30) = 0;
+				memcpy(WBUFP(buf, 54), md->desc, NAME_LENGTH);
+				memcpy(WBUFP(buf, 78), bg_army[bgd->army], NAME_LENGTH);
+			}
+			else if (md->guardian_data && md->guardian_data->g) {
 					WBUFW(buf, 0) = cmd = 0x195;
 					WBUFB(buf,30) = 0;
 					memcpy(WBUFP(buf,54), md->guardian_data->g->name, NAME_LENGTH);
@@ -9508,6 +9529,9 @@ void clif_parse_LoadEndAck(int fd, struct map_session_data *sd) {
 
 		//Login Event
 		npc->script_event(sd, NPCE_LOGIN);
+
+		if (!map->list[sd->bl.m].flag.pvp && !map->list[sd->bl.m].flag.gvg)
+			clif->showdigit(sd, (unsigned char)3, 0);
 	} else {
 		//For some reason the client "loses" these on warp/map-change.
 		clif->updatestatus(sd,SP_STR);
@@ -9593,6 +9617,9 @@ void clif_parse_LoadEndAck(int fd, struct map_session_data *sd) {
 	if(map->list[sd->bl.m].flag.loadevent) // Lance
 		npc->script_event(sd, NPCE_LOADMAP);
 
+	if( battle_config.queue_only_towns && sd->queue_id && !queue_check_map(sd) )
+		queue_leave(sd,1);
+
 	if (pc->checkskill(sd, SG_DEVIL) && !pc->nextjobexp(sd)) //blindness [Komurka]
 		clif->sc_end(&sd->bl, sd->bl.id, SELF, SI_DEVIL1);
 
@@ -9631,6 +9658,13 @@ void clif_parse_LoadEndAck(int fd, struct map_session_data *sd) {
 	// Trigger skill effects if you appear standing on them
 	if(!battle_config.pc_invincible_time)
 		skill->unit_move(&sd->bl,timer->gettick(),1);
+
+	if (sd->bg_id)
+	{
+		struct battleground_data *bgd = bg->team_search(sd->bg_id);
+		if (bgd != NULL && bgd->master_id == sd->status.char_id)
+			bg->change_skill(sd, true);
+	}
 
 	// NPC Quest / Event Icon Check [Kisuka]
 #if PACKETVER >= 20090218
@@ -9800,6 +9834,12 @@ void clif_parse_WalkToXY(int fd, struct map_session_data *sd)
 
 	//Set last idle time... [Skotlex]
 	pc->update_idle_time(sd, BCIDLE_WALK);
+
+	if (sd->bg_afk_timer && sd->bg_afk_timer != INVALID_TIMER )
+	{
+		timer->delete(sd->bg_afk_timer, bg->report_afk);
+		sd->bg_afk_timer = INVALID_TIMER;
+	}
 
 	unit->walktoxy(&sd->bl, x, y, 4);
 }
@@ -16440,6 +16480,18 @@ void clif_sendbgemblem_single(int fd, struct map_session_data *sd)
 	WFIFOSET(fd,packet_len(0x2dd));
 }
 
+// [CreativeSD]: Send Emblem Mob.
+void clif_sendbgmobemblem_single(int fd, struct mob_data *md)
+{
+	nullpo_retv(md);
+	WFIFOHEAD(fd, 32);
+	WFIFOW(fd, 0) = 0x2dd;
+	WFIFOL(fd, 2) = md->bl.id;
+	safestrncpy((char*)WFIFOP(fd, 6), md->name, NAME_LENGTH);
+	WFIFOW(fd, 30) = md->bg_id;
+	WFIFOSET(fd, packet_len(0x2dd));
+}
+
 /// Custom Fonts (ZC_NOTIFY_FONT).
 /// 02ef <account_id>.L <font id>.W
 void clif_font(struct map_session_data *sd)
@@ -19601,6 +19653,7 @@ void clif_defaults(void) {
 	clif->bg_updatescore_single = clif_bg_updatescore_single;
 	clif->sendbgemblem_area = clif_sendbgemblem_area;
 	clif->sendbgemblem_single = clif_sendbgemblem_single;
+	clif->sendbgmobemblem_single = clif_sendbgmobemblem_single;
 	/* instance-related */
 	clif->instance = clif_instance;
 	clif->instance_join = clif_instance_join;

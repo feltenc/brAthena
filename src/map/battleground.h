@@ -34,6 +34,12 @@ struct map_session_data;
 #define MAX_BG_MEMBERS 30
 #define BG_DELAY_VAR_LENGTH 30
 
+// [CreativeSD]: Names & Version
+#define MAX_BG_POSITION 4
+static const char bg_version[7] = "6.0.01";
+static const char bg_army[2][NAME_LENGTH] = { "Exército de Guillaume", "Exército de Croix" };
+static const char bg_pos_name[MAX_BG_POSITION][NAME_LENGTH] = { "Capitão", "Tenente", "Sargento", "Soldado" };
+
 /**
  * Enumerations
  **/
@@ -61,12 +67,15 @@ struct battleground_member_data {
 struct battleground_data {
 	unsigned int bg_id;
 	unsigned char count;
+	int army, master_id, timerdigit_count, timerdigit; // [CreativeSD]
 	struct battleground_member_data members[MAX_BG_MEMBERS];
-	// BG Cementery
-	unsigned short mapindex, x, y;
+	// BG Cementery & Respawn
+	unsigned short mapindex, x, y, respawn_x, respawn_y;
 	// Logout Event
 	char logout_event[EVENT_NAME_LENGTH];
 	char die_event[EVENT_NAME_LENGTH];
+	// Without Event
+	char without_event[EVENT_NAME_LENGTH];
 };
 
 struct bg_arena {
@@ -122,10 +131,10 @@ struct battleground_interface {
 	bool (*team_delete) (int bg_id);
 	bool (*team_warp) (int bg_id, unsigned short map_index, short x, short y);
 	void (*send_dot_remove) (struct map_session_data *sd);
-	bool (*team_join) (int bg_id, struct map_session_data *sd);
+	bool (*team_join) (int bg_id, struct map_session_data *sd, int flag);
 	int (*team_leave) (struct map_session_data *sd, enum bg_team_leave_type flag);
 	bool (*member_respawn) (struct map_session_data *sd);
-	int (*create) (unsigned short map_index, short rx, short ry, const char *ev, const char *dev);
+	int (*create) (unsigned short map_index, short rx, short ry, short rsx, short rsy, int army, const char *ev, const char *dev, const char *wev);
 	int (*team_get_id) (struct block_list *bl);
 	bool (*send_message) (struct map_session_data *sd, const char *mes);
 	int (*send_xy_timer_sub) (DBKey key, DBData *data, va_list ap);
@@ -133,6 +142,10 @@ struct battleground_interface {
 	int (*afk_timer) (int tid, int64 tick, int id, intptr_t data);
 	/* */
 	enum bg_queue_types (*str2teamtype) (const char *str);
+	/*==========================================
+	 * CreativeSD: BattleGround Queue Expansive
+	 *------------------------------------------*/
+#include "map/battleground_def.inc"
 	/* */
 	void (*config_read) (void);
 };

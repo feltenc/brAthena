@@ -162,7 +162,7 @@ struct mob_data {
 	struct status_data status, *base_status; //Second one is in case of leveling up mobs, or tiny/large mobs.
 	struct status_change sc;
 	struct mob_db *db; //For quick data access (saves doing mob_db(md->class_) all the time) [Skotlex]
-	char name[NAME_LENGTH];
+	char name[NAME_LENGTH], desc[NAME_LENGTH];
 	struct {
 		unsigned int size : 2; //Small/Big monsters. @see enum size
 		unsigned int ai : 4; //Special AI for summoned monsters. @see enum ai
@@ -412,7 +412,7 @@ struct {
 #define mob_stop_walking(md, type) (unit->stop_walking(&(md)->bl, (type)))
 #define mob_stop_attack(md)        (unit->stop_attack(&(md)->bl))
 
-#define mob_is_battleground(md) (map->list[(md)->bl.m].flag.battleground && ((md)->class_ == MOBID_BARRICADE_ || ((md)->class_ >= MOBID_OBJ_A && (md)->class_ <= MOBID_OBJ_B2)))
+#define mob_is_battleground(md) (map->list[(md)->bl.m].flag.battleground && ((md)->class_ == MOBID_BARRICADE_ || (md)->class_ == MOBID_EMPELIUM || (md)->class_ == MOBID_BARRICADE || (md)->class_ == MOBID_S_EMPEL_1 || (md)->class_ == MOBID_S_EMPEL_2 || ((md)->class_ >= MOBID_OBJ_A && (md)->class_ <= MOBID_OBJ_B2)))
 #define mob_is_gvg(md) (map->list[(md)->bl.m].flag.gvg_castle && ( (md)->class_ == MOBID_EMPELIUM || (md)->class_ == MOBID_BARRICADE || (md)->class_ == MOBID_S_EMPEL_1 || (md)->class_ == MOBID_S_EMPEL_2))
 #define mob_is_treasure(md) (((md)->class_ >= MOBID_TREASURE_BOX1 && (md)->class_ <= MOBID_TREASURE_BOX40) || ((md)->class_ >= MOBID_TREASURE_BOX41 && (md)->class_ <= MOBID_TREASURE_BOX49))
 
@@ -449,7 +449,7 @@ struct mob_interface {
 	int (*once_spawn) (struct map_session_data *sd, int16 m, int16 x, int16 y, const char *mobname, int class_, int amount, const char *event, unsigned int size, unsigned int ai);
 	int (*once_spawn_area) (struct map_session_data *sd, int16 m, int16 x0, int16 y0, int16 x1, int16 y1, const char *mobname, int class_, int amount, const char *event, unsigned int size, unsigned int ai);
 	int (*spawn_guardian) (const char *mapname, short x, short y, const char *mobname, int class_, const char *event, int guardian, bool has_index);
-	int (*spawn_bg) (const char *mapname, short x, short y, const char *mobname, int class_, const char *event, unsigned int bg_id);
+	int (*spawn_bg) (const char *mapname, short x, short y, const char *mobname, int class_, const char *event, unsigned int bg_id, const char *info);
 	int (*can_reach) (struct mob_data *md, struct block_list *bl, int range, int state);
 	int (*linksearch) (struct block_list *bl, va_list ap);
 	int (*delayspawn) (int tid, int64 tick, int id, intptr_t data);

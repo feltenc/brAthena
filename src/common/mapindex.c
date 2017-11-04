@@ -1075,7 +1075,24 @@ const char *map_list[MAX_MAPINDEX] = {
 	//"tank_test",
 	//"tank_test2",
 	//"test",
-
+	
+	// [CreativeSD]
+	// Warrios of Midgard
+	"bat_d01",
+	"bat_d02",
+	// Kingdom
+	"bat_g01",
+	"bat_g02",
+	// Kingdom Advanced
+	"bat_s01",
+	"bat_s02",
+	// Time Assault
+	"bat_t01",
+	"bat_t02",
+	// Valfreyja
+	"bat_v01",
+	"bat_v02",
+	
 	/** Mapas Personalizados **/
 	"custom_map"
 };

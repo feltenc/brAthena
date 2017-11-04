@@ -479,6 +479,7 @@ int can_copy (struct map_session_data *sd, uint16 skill_id, struct block_list* b
 int skillnotok (uint16 skill_id, struct map_session_data *sd)
 {
 	int16 idx,m;
+	struct battleground_data *bgd = NULL;
 	nullpo_retr (1, sd);
 	m = sd->bl.m;
 	idx = skill->get_index(skill_id);
@@ -572,6 +573,13 @@ int skillnotok (uint16 skill_id, struct map_session_data *sd)
 				return 1;
 			}
 			break;
+		case BG_EMERGENCYCALL:
+			if (!sd->bg_id || (bgd = bg->team_search(sd->bg_id)) == NULL || bgd->master_id != sd->status.char_id || !map->list[m].flag.battleground || map->list[m].flag.nobgskillcall )
+			{
+				clif->skill_fail(sd,skill_id,USESKILL_FAIL_LEVEL,0);
+				return 1;
+			}
+			break;
 		case GD_EMERGENCYCALL:
 			if( !(battle_config.emergency_call&((map->agit_flag || map->agit2_flag)?2:1))
 			 || !(battle_config.emergency_call&(map->list[m].flag.gvg || map->list[m].flag.gvg_castle?8:4))
@@ -593,6 +601,11 @@ int skillnotok (uint16 skill_id, struct map_session_data *sd)
 			break;
 
 	}
+
+	//[CreativeSD]: No Battleground Skill in Cell Area.
+	if( map->list[m].flag.battleground && map->getcell(m,&sd->bl,sd->bl.x,sd->bl.y,CELL_CHKNOBATTLEGROUND) )
+		return 1;
+
 	return (map->list[m].flag.noskill);
 }
 
@@ -8459,6 +8472,82 @@ int skill_castend_nodamage_id(struct block_list *src, struct block_list *bl, uin
 			}
 			break;
 
+		// BattleGround [CreativeSD]
+		case BG_BATTLEORDER:
+			if(flag&1) {
+				if ( bg->team_get_id(src) == bg->team_get_id(bl))
+					sc_start(src,bl,type,100,skill_lv,skill->get_time(skill_id, skill_lv));
+			} else if (bg->team_get_id(src)) {
+				clif->skill_nodamage(src,bl,skill_id,skill_lv,1);
+				map->foreachinrange(skill->area_sub, src,
+				                    skill->get_splash(skill_id, skill_lv), BL_PC,
+				                    src,skill_id,skill_lv,tick, flag|BCT_NOENEMY|1,
+				                    skill->castend_nodamage_id);
+				if (sd)
+					bg->block_skill(sd,skill->get_time2(skill_id,skill_lv));
+			}
+			break;
+		case BG_REGENERATION:
+			if(flag&1) {
+				if (bg->team_get_id(src) == bg->team_get_id(bl))
+					sc_start(src,bl,type,100,skill_lv,skill->get_time(skill_id, skill_lv));
+			} else if (bg->team_get_id(src)) {
+				clif->skill_nodamage(src,bl,skill_id,skill_lv,1);
+				map->foreachinrange(skill->area_sub, src,
+				                    skill->get_splash(skill_id, skill_lv), BL_PC,
+				                    src,skill_id,skill_lv,tick, flag|BCT_NOENEMY|1,
+				                    skill->castend_nodamage_id);
+				if (sd)
+					bg->block_skill(sd,skill->get_time2(skill_id,skill_lv));
+			}
+			break;
+		case BG_RESTORE:
+			if(flag&1) {
+				if( bg->team_get_id(src) == bg->team_get_id(bl) )
+					clif->skill_nodamage(src,bl,AL_HEAL,status_percent_heal(bl,90,90),1);
+			}
+			else if( bg->team_get_id(src) ) {
+				clif->skill_nodamage(src,bl,skill_id,skill_lv,1);
+				map->foreachinrange(skill->area_sub, src,
+				                    skill->get_splash(skill_id, skill_lv), BL_PC,
+				                    src,skill_id,skill_lv,tick, flag|BCT_NOENEMY|1,
+				                    skill->castend_nodamage_id);
+				if(sd)
+					bg->block_skill(sd,skill->get_time2(skill_id,skill_lv));
+			}
+			break;
+		case BG_EMERGENCYCALL:
+			{
+				int dx[9]={-1, 1, 0, 0,-1, 1,-1, 1, 0};
+				int dy[9]={ 0, 0, 1,-1, 1,-1,-1, 1, 0};
+				int i, j = 0;
+				struct battleground_data *bgd;
+				if( !sd->bg_id )
+					break;
+
+				bgd = bg->team_search(sd->bg_id);
+
+				if( !bgd )
+					break;
+			
+				clif->skill_nodamage(src,bl,skill_id,skill_lv,1);
+				for ( i = 0; bgd->members[i].sd; i++ )
+				{
+					if (j>8) j=0;
+					if ((dstsd = bgd->members[i].sd) != NULL && sd != dstsd && !dstsd->state.autotrade && !pc_isdead(dstsd)) {
+						if ( !map->list[dstsd->bl.m].flag.battleground )
+							continue;
+						if (map->getcell(src->m, src, src->x + dx[j], src->y + dy[j], CELL_CHKNOREACH))
+							dx[j] = dy[j] = 0;
+						pc->setpos(dstsd, map_id2index(src->m), src->x+dx[j], src->y+dy[j], CLR_RESPAWN);
+					}
+				}
+
+				if(sd)
+					bg->block_skill(sd,skill->get_time2(skill_id,skill_lv));
+			}
+			break;
+
 		case SG_FEEL:
 			//AuronX reported you CAN memorize the same map as all three. [Skotlex]
 			if (sd) {
@@ -13873,6 +13962,7 @@ int skill_check_condition_castbegin(struct map_session_data* sd, uint16 skill_id
 	struct status_data *st;
 	struct status_change *sc;
 	struct skill_condition require;
+	struct battleground_data *bgd = NULL;
 
 	nullpo_ret(sd);
 
@@ -14331,6 +14421,22 @@ int skill_check_condition_castbegin(struct map_session_data* sd, uint16 skill_id
 		case GD_EMERGENCYCALL:
 			// other checks were already done in skillnotok()
 			if (!sd->status.guild_id || !sd->state.gmaster_flag)
+				return 0;
+			break;
+
+		// BattleGround [CreativeSD]
+		case BG_BATTLEORDER:
+		case BG_REGENERATION:
+		case BG_RESTORE:
+			if (!sd->bg_id || (bgd = bg->team_search(sd->bg_id)) == NULL || bgd->master_id != sd->status.char_id || !map->list[sd->bl.m].flag.battleground)
+			{
+				clif->skill_fail(sd,skill_id,USESKILL_FAIL_LEVEL,0);
+				return 0;
+			}
+			break;
+
+		case BG_EMERGENCYCALL:
+			if (!sd->bg_id || (bgd = bg->team_search(sd->bg_id)) == NULL || bgd->master_id != sd->status.char_id || !map->list[sd->bl.m].flag.battleground || map->list[sd->bl.m].flag.nobgskillcall)
 				return 0;
 			break;
 

@@ -34,6 +34,7 @@
 #include "map/party.h"
 #include "map/pc.h"
 #include "map/pet.h"
+#include "map/queue.h"
 #include "common/cbasetypes.h"
 #include "common/conf.h"
 #include "common/memmgr.h"
@@ -86,7 +87,13 @@ bool bg_team_warp(int bg_id, unsigned short map_index, short x, short y) {
 	struct battleground_data *bgd = bg->team_search(bg_id);
 	if( bgd == NULL ) return false;
 	for( i = 0; i < MAX_BG_MEMBERS; i++ )
-		if( bgd->members[i].sd != NULL ) pc->setpos(bgd->members[i].sd, map_index, x, y, CLR_TELEPORT);
+	{
+		if( bgd->members[i].sd != NULL )
+		{
+			bg->respawn_timer_delete(bgd->members[i].sd);
+			pc->setpos(bgd->members[i].sd, map_index, x, y, CLR_TELEPORT);
+		}
+	}
 	return true;
 }
 
@@ -96,9 +103,10 @@ void bg_send_dot_remove(struct map_session_data *sd) {
 }
 
 /// Player joins team
-bool bg_team_join(int bg_id, struct map_session_data *sd) {
+bool bg_team_join(int bg_id, struct map_session_data *sd, int flag) {
 	int i;
 	struct battleground_data *bgd = bg->team_search(bg_id);
+	char output[128];
 
 	if( bgd == NULL || sd == NULL || sd->bg_id ) return false;
 
@@ -130,6 +138,16 @@ bool bg_team_join(int bg_id, struct map_session_data *sd) {
 
 	clif->bg_hp(sd);
 	clif->bg_xy(sd);
+
+	sd->bg_respawn_timer_count = 10;
+	sd->bg_respawn_timer = timer->add(timer->gettick()+1, bg->respawn_timer, sd->bl.id, 0);
+
+	if (flag)
+	{
+		sprintf(output, "Batalhas Campais : %s ingressou nas Fileiras do Exército.", sd->status.name);
+		clif->bg_message(bgd, 0, "Server", output, strlen(output) + 1);
+		bg->refresh_patent(bg_id);
+	}
 	return true;
 }
 
@@ -180,6 +198,24 @@ int bg_team_leave(struct map_session_data *sd, enum bg_team_leave_type flag) {
 		bg->queue_pc_cleanup(sd);
 	}
 
+	// Clear Fakes Name Battleground Queue System. [CreativeSD]
+	sd->bg_position = 0;
+	if ( battle_config.bg_name_position && bgd->count > 0 )
+		bg->refresh_patent(bg_id);
+
+	if (bgd->master_id == sd->status.char_id && battle_config.bg_enable_skills)
+		bg->change_skill(sd, false);	// Remove BattleGround Skill
+
+	// Without Event and Refresh Position.
+	if (flag)
+	{
+		if (bgd->count <= 0 && bgd->without_event[0])
+		{
+			if (!npc->event_do(bgd->without_event))
+				ShowError("BattleGround Without Event '%s' not found!\n", bgd->without_event);
+		}
+	}
+
 	return bgd->count;
 }
 
@@ -193,10 +229,15 @@ bool bg_member_respawn(struct map_session_data *sd) {
 	pc->setpos(sd, bgd->mapindex, bgd->x, bgd->y, CLR_OUTSIGHT);
 	status->revive(&sd->bl, 1, 100);
 
+	if( !map->list[sd->bl.m].flag.nobgrespawn && bgd->respawn_x && bgd->respawn_y )
+	{
+		sd->bg_respawn_timer_count = 10;
+		sd->bg_respawn_timer = timer->add(timer->gettick()+1, bg->respawn_timer, sd->bl.id, 0);
+	}
 	return true; // Warped
 }
 
-int bg_create(unsigned short map_index, short rx, short ry, const char *ev, const char *dev) {
+int bg_create(unsigned short map_index, short rx, short ry, short rsx, short rsy, int army, const char *ev, const char *dev, const char *wev) {
 	struct battleground_data *bgd;
 	bg->team_counter++;
 
@@ -206,8 +247,12 @@ int bg_create(unsigned short map_index, short rx, short ry, const char *ev, cons
 	bgd->mapindex = map_index;
 	bgd->x = rx;
 	bgd->y = ry;
+	bgd->respawn_x = rsx;
+	bgd->respawn_y = rsy;
+	bgd->army = army;
 	safestrncpy(bgd->logout_event, ev, sizeof(bgd->logout_event));
 	safestrncpy(bgd->die_event, dev, sizeof(bgd->die_event));
+	safestrncpy(bgd->without_event, wev, sizeof(bgd->without_event));
 
 	memset(&bgd->members, 0, sizeof(bgd->members));
 	idb_put(bg->team_db, bg->team_counter, bgd);
@@ -910,6 +955,12 @@ enum BATTLEGROUNDS_QUEUE_ACK bg_canqueue(struct map_session_data *sd, struct bg_
 	}
 	return BGQA_SUCCESS;
 }
+
+/*==========================================
+ * CreativeSD: BattleGround Queue Expansive
+ *------------------------------------------*/
+#include "map/battleground_func.inc"
+
 void do_init_battleground(bool minimal) {
 	if (minimal)
 		return;
@@ -917,7 +968,13 @@ void do_init_battleground(bool minimal) {
 	bg->team_db = idb_alloc(DB_OPT_RELEASE_DATA);
 	timer->add_func_list(bg->send_xy_timer, "bg_send_xy_timer");
 	timer->add_interval(timer->gettick() + battle_config.bg_update_interval, bg->send_xy_timer, 0, 0, battle_config.bg_update_interval);
+	timer->add_func_list(bg->report_afk, "bg_report_afk");
+	timer->add_func_list(bg->respawn_timer, "bg_respawn_timer");
+	timer->add_func_list(bg->digit_timer, "bg_digit_timer");
 	bg->config_read();
+	
+	ShowMessage(CL_WHITE"[BattleGround]:"CL_RESET" BattleGround Queue Expansive System (version: %s) successfully initialized.\n", bg_version);
+	ShowMessage(CL_WHITE"[BattleGround]:"CL_RESET" by (c) CreativeSD, suport in www.creativesd.com.br\n");
 }
 
 void do_final_battleground(void)
@@ -979,4 +1036,15 @@ void battleground_defaults(void) {
 	bg->str2teamtype = bg_str2teamtype;
 	/* */
 	bg->config_read = bg_config_read;
+	/*==========================================
+	 * CreativeSD: BattleGround Queue Expansive
+	 *------------------------------------------*/
+	bg->refresh_patent = bg_refresh_patent;
+	bg->change_skill = bg_change_skill;
+	bg->block_skill = bg_block_skill;
+	bg->report_afk = bg_report_afk;
+	bg->change_master = bg_change_master;
+	bg->respawn_timer = bg_respawn_timer;
+	bg->respawn_timer_delete = bg_respawn_timer_delete;
+	bg->digit_timer = bg_digit_timer;
 }

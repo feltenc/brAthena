@@ -256,6 +256,15 @@ int mob_parse_dataset(struct spawn_data *data)
 		if( data->eventname[0] == '"' ) //Strip leading quotes
 			memmove(data->eventname, data->eventname+1, len-1);
 	}
+
+	if ((len = strlen(data->desc)) > 0)
+	{
+		if (data->desc[len-1] == '"')
+			data->desc[len-1] = '\0'; //Remove trailing quote.
+		if (data->desc[0] == '"') //Strip leading quotes
+			memmove(data->desc, data->desc + 1, len - 1);
+	}
+
 	if(!data->name){
 		if(mob->db(data->class_) == NULL)
 			ShowError("mob_parse_dataset - Monstro [ID = %d] não existente na base de dados, ignorando...",data->class_);
@@ -281,6 +290,7 @@ struct mob_data* mob_spawn_dataset(struct spawn_data *data) {
 	if (data->level > 0 && data->level <= MAX_LEVEL)
 		md->level = data->level;
 	memcpy(md->name, data->name, NAME_LENGTH);
+	memcpy(md->desc, data->desc, NAME_LENGTH);
 	if (data->state.ai)
 		md->special_state.ai = data->state.ai;
 	if (data->state.size)
@@ -718,7 +728,7 @@ int mob_spawn_guardian(const char* mapname, short x, short y, const char* mobnam
 /*==========================================
  * Summoning BattleGround [Zephyrus]
  *------------------------------------------*/
-int mob_spawn_bg(const char* mapname, short x, short y, const char* mobname, int class_, const char* event, unsigned int bg_id)
+int mob_spawn_bg(const char* mapname, short x, short y, const char* mobname, int class_, const char* event, unsigned int bg_id, const char* info)
 {
 	struct mob_data *md = NULL;
 	struct spawn_data data;
@@ -747,6 +757,7 @@ int mob_spawn_bg(const char* mapname, short x, short y, const char* mobname, int
 	data.x = x;
 	data.y = y;
 	safestrncpy(data.name, mobname, sizeof(data.name));
+	safestrncpy(data.desc, info, sizeof(data.desc));
 	safestrncpy(data.eventname, event, sizeof(data.eventname));
 	if( !mob->parse_dataset(&data) )
 		return 0;

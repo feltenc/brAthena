@@ -542,6 +542,10 @@ void initChangeTables(void) {
 	set_sc( GD_BATTLEORDER       , SC_GDSKILL_BATTLEORDER    , SI_BLANK           , SCB_STR|SCB_INT|SCB_DEX );
 	set_sc( GD_REGENERATION      , SC_GDSKILL_REGENERATION    , SI_BLANK           , SCB_REGEN );
 
+	// BattleGround [CreativeSD]
+	set_sc( BG_BATTLEORDER       , SC_GDSKILL_BATTLEORDER    , SI_BLANK           , SCB_STR|SCB_INT|SCB_DEX );
+	set_sc( BG_REGENERATION      , SC_GDSKILL_REGENERATION    , SI_BLANK           , SCB_REGEN );
+
 	/**
 	* Rune Knight
 	**/
@@ -2220,8 +2224,22 @@ int status_calc_mob_(struct mob_data* md, enum e_status_calc_opt opt) {
 		// Strengthen Guardians - custom value +10% / lv
 		struct guild_castle *gc;
 		gc=guild->mapname2gc(map->list[md->bl.m].name);
-		if (!gc)
+		if (!gc && !map->list[md->bl.m].flag.battleground)
 			ShowError("status_calc_mob: No castle set at map %s\n", map->list[md->bl.m].name);
+		else if (map->list[md->bl.m].flag.battleground && md->class_ == MOBID_EMPELIUM) {
+#ifdef RENEWAL
+			mstatus->max_hp += 50 * 100;
+			mstatus->max_sp += 70 * 100;
+#else
+			mstatus->max_hp += 1000 * 100;
+			mstatus->max_sp += 200 * 100;
+#endif
+			mstatus->hp = mstatus->max_hp;
+			mstatus->sp = mstatus->max_sp;
+			mstatus->def += (100 + 2) / 3;
+			mstatus->mdef += (100 + 2) / 3;
+			
+		}
 		else
 			if (gc->castle_id < 24 || md->class_ == MOBID_EMPELIUM) {
 #ifdef RENEWAL

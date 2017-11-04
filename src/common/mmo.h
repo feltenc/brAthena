@@ -130,7 +130,7 @@
 #define MAX_SKILL 1510
 #define MAX_SKILL_ID 10015   // [Ind/Hercules] max used skill ID
 // Update this max as necessary. 86 is the value needed for Expanded Super Novice.
-#define MAX_SKILL_TREE 86
+#define MAX_SKILL_TREE 90
 #define DEFAULT_WALK_SPEED 150
 #define MIN_WALK_SPEED 20 /* below 20 clips animation */
 #define MAX_WALK_SPEED 1000
@@ -164,7 +164,7 @@
 //Includes null-terminator as it is the length of the array.
 #define NAME_LENGTH (23 + 1)
 //Tamanho dos nomes para npcs
-#define NPC_NAME_LENGTH 37
+#define NPC_NAME_LENGTH 38
 //For item names, which tend to have much longer names.
 #define ITEM_NAME_LENGTH 50
 //For Map Names, which the client considers to be 16 in length including the .gat extension.
@@ -559,6 +559,9 @@ struct mmo_charstatus {
 	uint32 uniqueitem_counter;
 
 	unsigned char hotkey_rowshift;
+
+	// Queue System
+	int queue_delay;
 };
 
 typedef enum mail_status {
@@ -776,6 +779,15 @@ enum {
 	GD_EMERGENCYCALL=10013,
 	GD_DEVELOPMENT=10014,
 	GD_MAX,
+};
+
+// Batalha Campais [CreativeSD]
+enum {
+	BG_EMERGENCYCALL = 1720,
+	BG_RESTORE,
+	BG_BATTLEORDER,
+	BG_REGENERATION,
+	BG_MAX,
 };
 
 //These mark the ID of the jobs, as expected by the client. [Skotlex]

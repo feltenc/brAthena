@@ -194,6 +194,9 @@
       <Filter>common</Filter>
     </ClCompile>
     <ClCompile Include="..\src\map\channel.c" />
+    <ClCompile Include="..\src\map\queue.c">
+      <Filter>map_sql</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\map\atcommand.h">
@@ -412,6 +415,9 @@
       <Filter>common</Filter>
     </ClInclude>
     <ClInclude Include="..\src\map\channel.h" />
+    <ClInclude Include="..\src\map\queue.h">
+      <Filter>map_sql</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="common">

@@ -47,6 +47,7 @@ struct party_booking_ad_info;
 struct party_data;
 struct pet_data;
 struct quest;
+struct queue_data;
 struct s_vending;
 struct skill_cd;
 struct skill_unit;
@@ -956,6 +957,7 @@ struct clif_interface {
 	void (*bg_updatescore_single) (struct map_session_data *sd);
 	void (*sendbgemblem_area) (struct map_session_data *sd);
 	void (*sendbgemblem_single) (int fd, struct map_session_data *sd);
+	void (*sendbgmobemblem_single) (int fd, struct mob_data *md);
 	/* instance-related */
 	int (*instance) (int instance_id, int type, int flag);
 	void (*instance_join) (int fd, int instance_id);

@@ -50,6 +50,7 @@
 #include "map/pc_groups.h"
 #include "map/pet.h" // pet_unlocktarget()
 #include "map/quest.h"
+#include "map/queue.h"
 #include "map/script.h" // script_config
 #include "map/skill.h"
 #include "map/status.h" // struct status_data
@@ -5690,6 +5691,11 @@ int pc_setpos(struct map_session_data* sd, unsigned short map_index, int x, int 
 		if (sd->npc_id)
 			npc->event_dequeue(sd);
 		npc->script_event(sd, NPCE_LOGOUT);
+
+		// [CreativeSD]: Queue System
+		if (sd->queue_id)
+			queue_leave(sd,4);
+
 		//remove from map, THEN change x/y coordinates
 		unit->remove_map_pc(sd,clrtype);
 		sd->mapindex = map_index;
@@ -7271,6 +7277,13 @@ int pc_allskillup(struct map_session_data *sd)
 	//Required because if you could level up all skills previously,
 	//the update will not be sent as only the lv variable changes.
 	clif->skillinfoblock(sd);
+
+	if (sd->bg_id)
+	{
+		struct battleground_data *bgd = bg->team_search(sd->bg_id);
+		if (bgd != NULL && bgd->master_id == sd->status.char_id)
+			bg->change_skill(sd, true);
+	}
 	return 0;
 }
 
@@ -7744,12 +7757,6 @@ int pc_dead(struct map_session_data *sd,struct block_list *src) {
 	pc_setglobalreg(sd,script->add_str("PC_DIE_COUNTER"),sd->die_counter+1);
 	pc->setparam(sd, SP_KILLERRID, src?src->id:0);
 
-	if( sd->bg_id ) {/* TODO: purge when bgqueue is deemed ok */
-		struct battleground_data *bgd;
-		if( (bgd = bg->team_search(sd->bg_id)) != NULL && bgd->die_event[0] )
-			npc->event(sd, bgd->die_event, 0);
-	}
-
 	for (i = 0; i < VECTOR_LENGTH(sd->script_queues); i++ ) {
 		struct script_queue *queue = script->queue(VECTOR_INDEX(sd->script_queues, i));
 		if (queue && queue->event_death[0] != '\0')
@@ -8039,6 +8046,10 @@ int pc_dead(struct map_session_data *sd,struct block_list *src) {
 		return 1|8;
 	} else if( sd->bg_id ) {
 		struct battleground_data *bgd = bg->team_search(sd->bg_id);
+
+		if( bgd && bgd->die_event[0] )
+			npc->event(sd, bgd->die_event, 0);
+
 		if( bgd && bgd->mapindex > 0 ) { // Respawn by BG
 			timer->add(tick+1000, pc->respawn_timer, sd->bl.id, 0);
 			return 1|8;
